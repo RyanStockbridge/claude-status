@@ -1,0 +1,12 @@
+{
+  "name": "ryan-tools",
+  "description": "Internal Claude Code plugins",
+  "owner": { "name": "Ryan" },
+  "plugins": [
+    {
+      "name": "claude-status",
+      "source": "./",
+      "description": "Live session status for the macOS menu bar app."
+    }
+  ]
+}

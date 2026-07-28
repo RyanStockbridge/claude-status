@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Atomic-write temp files from the status writer
+*.tmp
+*.tmp.*
+
+# Runtime status directory lives in ~/.claude/status, never in the repo

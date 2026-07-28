@@ -1,0 +1,7 @@
+{
+  "name": "claude-status",
+  "description": "Publishes live Claude Code session state (working / waiting / done / error) to ~/.claude/status so a macOS menu bar app can show it at a glance.",
+  "version": "0.1.1",
+  "author": { "name": "Ryan" },
+  "keywords": ["status", "menubar", "macos", "hooks"]
+}
