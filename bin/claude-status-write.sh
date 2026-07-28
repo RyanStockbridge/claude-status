@@ -119,6 +119,18 @@ if [ -s "$tmp" ]; then
   mv -f "$tmp" "$file" 2>/dev/null || rm -f "$tmp"
 else
   rm -f "$tmp"
+  exit 0
+fi
+
+# Notify only on a real state change, and only if the write landed. The notifier
+# gates itself on config; keep it detached so it can never stall the session.
+prev_state="$(printf '%s' "$prev" | jq -r '.state // ""' 2>/dev/null)"
+prev_since="$(printf '%s' "$prev" | jq -r '.state_since // 0' 2>/dev/null)"
+if [ "$prev_state" != "$STATE" ]; then
+  notifier="$(dirname "$0")/claude-status-notify.sh"
+  if [ -x "$notifier" ]; then
+    "$notifier" "$sid" "$STATE" "$prev_state" "$prev_since" >/dev/null 2>&1 &
+  fi
 fi
 
 exit 0

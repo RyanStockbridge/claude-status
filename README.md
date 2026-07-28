@@ -57,7 +57,7 @@ updates. They still need SwiftBar and the plugin symlink, so have them run
 
 ## How it works
 
-Three moving parts, ~200 lines total.
+The moving parts:
 
 **`bin/claude-status-write.sh`** — one hook handler for every event. Reads the
 hook payload on stdin, writes `~/.claude/status/<session_id>.json`. Writes are
@@ -79,6 +79,16 @@ actual session.
 | `SessionEnd` | — | record deleted |
 
 Every handler is `"async": true`, so none of this adds latency to a turn.
+
+**`bin/claude-status-notify.sh`** — fired by the writer only when a session
+actually changes state. Sends a desktop notification via `terminal-notifier`
+(click the banner to jump straight to that session, and repeat banners for one
+session collapse into a group) or falls back to `osascript` if
+`terminal-notifier` isn't installed. Gated by config (see
+[Notifications](#notifications)); by default it stays quiet for the routine
+`working`/`idle` states and only speaks up for `blocked`, `waiting`, `done`, and
+`error`, with a sound reserved for `blocked`/`error`. Like the writer, every
+path exits 0.
 
 **`swiftbar/claude-status.1s.py`** — reads the directory once a second, groups
 by project, sorts attention-first. Sweeps records older than 6h (crashed
@@ -112,6 +122,41 @@ tab inside a window.
 - **Faster/slower refresh:** rename the plugin file — `claude-status.2s.py`,
   `.5s.py`, etc. SwiftBar reads the interval from the filename.
 - **Different status dir:** set `CLAUDE_STATUS_DIR` (both halves respect it).
+
+### Notifications
+
+Banners are on by default for the states that want your attention. To tune them,
+create `~/.claude/claude-status.json`:
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "min_turn_seconds": 0,
+    "states": {
+      "blocked": true,
+      "waiting": true,
+      "done": true,
+      "error": true,
+      "working": false,
+      "idle": false
+    }
+  }
+}
+```
+
+- **`enabled`** — master switch. Set to `false` to silence everything (a real
+  `false`, not just a missing key, is honored).
+- **`states`** — turn any individual state on or off. Omitted states keep their
+  defaults (on for `error`/`blocked`/`waiting`/`done`, off for
+  `working`/`idle`).
+- **`min_turn_seconds`** — suppress the "done" banner when a turn finished faster
+  than this, so quick one-off commands don't ping you. Only affects the
+  `working`→`done`/`idle` transition; attention states always come through.
+
+Install [`terminal-notifier`](https://github.com/julienXX/terminal-notifier)
+(`brew install terminal-notifier`) for clickable, grouped banners; without it,
+notifications still work through `osascript` but can't be clicked to jump.
 
 ## Remote sessions (VS Code Remote SSH)
 

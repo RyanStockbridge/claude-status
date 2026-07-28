@@ -20,13 +20,16 @@ Claude Code hooks ──> bin/claude-status-write.sh ──> ~/.claude/status/<s
 
 * **Writer** — one handler for every hook event, dispatching on `$1` (the state
   name) rather than parsing the payload for it. Atomic write via temp+rename.
-  Intended to fire the notifier only when `prev_state != new_state` (wiring
-  landing with the notifier — see below).
-* **Notifier** — *(in progress, being built now)* reads
-  `~/.claude/status/<sid>.json` and `~/.claude/claude-status.json`, delivers via
-  `terminal-notifier` (clickable, grouped per session) or falls back to
-  `osascript`. Config gating: global off-switch, per-state enable,
-  `min_turn_seconds`.
+  Fires the notifier only when `prev_state != new_state`, detached so it can
+  never stall the session; passes it `<sid> <new_state> <prev_state>
+  <prev_state_since>`.
+* **Notifier** — reads `~/.claude/status/<sid>.json` and
+  `~/.claude/claude-status.json`, delivers via `terminal-notifier` (clickable —
+  click jumps to the session, grouped per session) or falls back to `osascript`.
+  Config gating: global off-switch, per-state enable (defaults: on for
+  `error`/`blocked`/`waiting`/`done`, off for `working`/`idle`),
+  `min_turn_seconds` (suppresses a `working`→`done`/`idle` flip whose turn was
+  shorter than N seconds). Sound only for `blocked`/`error`.
 * **Renderer** — SwiftBar plugin. Sweeps records older than 6h, flags `working`
   sessions idle >120s as possibly stalled.
 * **Jump** — tmux pane and iTerm session are exact; VS Code is window-only.
@@ -68,7 +71,11 @@ stub must log to a file.
 
 Verified so far: state transitions, title derivation through IDE noise,
 idempotent `settings.json` merge against a file with pre-existing unrelated
-hooks, malformed stdin.
+hooks, malformed stdin. Notifier: fires only on state change, config gating
+(global off, per-state, `min_turn_seconds`), terminal-notifier argv (title,
+group, subtitle, `-execute` jump, sound on blocked/error), and osascript
+fallback when terminal-notifier is absent — all checked on macOS by stubbing
+`terminal-notifier`/`osascript` into PATH.
 
 Never verified — no macOS in the authoring environment: all AppleScript,
 `open -b`, `lsappinfo`, `pbcopy`, `defaults`, and SwiftBar rendering itself.
