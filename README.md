@@ -97,20 +97,27 @@ activity for 2min as possibly wedged.
 
 ### Jumping to a session
 
-`bin/claude-status-jump.sh` uses terminal identity captured from the
+`bin/claude-status-jump.sh` uses the session's launch surface
+(`CLAUDE_CODE_ENTRYPOINT`) and the terminal identity captured from the
 environment at hook time, in descending order of precision:
 
-| Host | Precision |
+| Surface | Precision |
 |---|---|
 | tmux | exact pane (`select-window` + `select-pane`) |
 | iTerm2 | exact session, via AppleScript on `ITERM_SESSION_ID` |
 | WezTerm | exact pane |
-| VS Code | the **window** holding that folder (`open -b com.microsoft.VSCode <cwd>`) |
+| VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel for that Claude session id |
+| VS Code integrated terminal | the **window** holding that folder (`open -b com.microsoft.VSCode <cwd>`); you pick the tab |
+| Claude desktop app | app only — activates Claude; no per-session route yet |
 | Terminal.app | app only — no reliable per-tab handle |
 
-VS Code is the honest limitation: you land in the right window but pick the
-Claude tab yourself. There's no URL scheme for targeting a specific terminal
-tab inside a window.
+The VS Code extension-panel jump piggybacks on a URI handler the official
+extension registers, so it needs no companion extension — the panel session id
+is Claude Code's own `session_id`, which is what we key records on. (Verified by
+reading the extension bundle; confirm against your own setup, since the bundle
+auto-updates often.) The integrated-terminal and desktop-app cases remain the
+honest limitations: you land in the right window/app but pick the session
+yourself.
 
 ---
 

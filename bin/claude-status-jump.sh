@@ -26,6 +26,7 @@ get() { jq -r --arg p "$1" 'getpath($p | split(".")) // "" | tostring' "$file" 2
 cwd="$(get cwd)"
 host="$(get host)"
 program="$(get term.program)"
+entrypoint="$(get entrypoint)"
 iterm="$(get term.iterm)"
 tmux_pane="$(get term.tmux_pane)"
 wezterm_pane="$(get term.wezterm_pane)"
@@ -41,6 +42,28 @@ if [ -n "$host" ] && [ "$host" != "$me" ]; then
   notify "Session is on $host — resume command copied to clipboard"
   exit 0
 fi
+
+# --- surface routing by entrypoint -----------------------------------------
+# CLAUDE_CODE_ENTRYPOINT tells us which app launched the session, which is the
+# only reliable signal for the windowless surfaces (the VS Code extension panel
+# and the Claude desktop app set no TERM_PROGRAM, so `program` is empty).
+case "$entrypoint" in
+  claude-vscode)
+    # The official extension registers a URI handler: /open?session=<id> calls
+    # createPanel(id), which reveals the existing panel for that Claude session
+    # id (the same id we key our records on). Opening the URI also brings VS Code
+    # to the front, so this both focuses the window and the exact session tab.
+    # (A session living only in the integrated terminal has no panel, so this
+    # would open a fresh one — the extension panel/sidebar is the common case.)
+    open "vscode://anthropic.claude-code/open?session=$sid" >/dev/null 2>&1 && exit 0
+    ;;
+  claude-desktop)
+    # No documented route to focus a specific session inside the desktop app yet
+    # (it registers the `claude://` scheme, grammar TBD). Activate the app.
+    open -b com.anthropic.claudefordesktop >/dev/null 2>&1 && exit 0
+    open -a Claude >/dev/null 2>&1 && exit 0
+    ;;
+esac
 
 # --- tmux: select the exact pane, then fall through to focus the terminal ---
 if [ -n "$tmux_pane" ] && command -v tmux >/dev/null 2>&1; then

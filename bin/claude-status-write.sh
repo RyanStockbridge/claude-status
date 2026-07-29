@@ -59,6 +59,7 @@ printf '%s' "$payload" | jq -c \
   --arg wezterm_pane "${WEZTERM_PANE:-}" \
   --arg kitty_window "${KITTY_WINDOW_ID:-}" \
   --arg vscode_pid "${VSCODE_PID:-}" \
+  --arg entrypoint "${CLAUDE_CODE_ENTRYPOINT:-}" \
   --arg remote "${CLAUDE_CODE_REMOTE:-}" \
   '
   # The VS Code / JetBrains extensions inject context blocks such as
@@ -102,6 +103,7 @@ printf '%s' "$payload" | jq -c \
       host:            $host,
       agent_pid:       (($pid | tonumber?) // null),
       remote:          ($remote == "true"),
+      entrypoint:      (if $entrypoint != "" then $entrypoint else $prev.entrypoint end),
       term: {
         program:       (if $term_program != "" then $term_program else $prev.term.program end),
         iterm:         (if $iterm        != "" then $iterm        else $prev.term.iterm end),
