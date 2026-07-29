@@ -34,9 +34,10 @@ Claude Code hooks ──> bin/claude-status-write.sh ──> ~/.claude/status/<s
   sessions idle >120s as possibly stalled.
 * **Jump** — routes on `CLAUDE_CODE_ENTRYPOINT` (the launch surface) first, then
   terminal identity. tmux pane and iTerm session are exact; the VS Code
-  extension panel is exact via a URI handler; VS Code integrated terminal is
-  window-only; the Claude desktop app can only be activated (no per-session
-  route yet).
+  extension panel is exact via the extension's URI handler
+  (`vscode://anthropic.claude-code/open?session=<id>`); the Claude desktop app is
+  exact via its own handler (`claude://resume?session=<id>`, verified live); VS
+  Code integrated terminal stays window-only.
 
 States: `idle` `working` `waiting` `blocked` `done` `error` (+ `closed` deletes
 the record).
@@ -86,31 +87,36 @@ Never verified — no macOS in the authoring environment: all AppleScript,
 
 ## Next up
 
-1. **Precise jump for the remaining surfaces.** The VS Code *extension panel*
-   case is solved (see the Jump bullet): the official `anthropic.claude-code`
-   extension registers a URI handler whose `/open?session=<id>` route calls
-   `createPanel(id)`, which does `sessionPanels.get(id).reveal()` — and that map
-   is keyed by Claude Code's own `session_id`, the same id we record. So
-   `open "vscode://anthropic.claude-code/open?session=<sid>"` reveals the exact
-   tab, no companion extension needed. Caveat: a session living only in the
-   integrated terminal has no panel, so the URI would spawn an empty one — the
-   jump only fires it for `entrypoint == claude-vscode`, which is the panel /
-   sidebar case. Verified by reading the (minified, fast-updating) bundle, not
-   yet confirmed live — recheck if the URI stops working after an update.
+1. **Precise jump per surface** — the two surfaces in daily use here are done,
+   both piggybacking on handlers the apps already register (no companion
+   extension), keyed on Claude Code's own `session_id`:
 
-   Two surfaces still lack a per-session jump:
+   * **Claude desktop app** (`entrypoint == claude-desktop`) — **done, verified
+     live.** The app's `claude://` handler (in `Claude.app/.../app.asar`) has a
+     top-level `switch(i.host)` with a `resume` host:
+     `claude://resume?session=<id>` → `importCliSession(id)` (id is the CLI
+     session id = our `session_id`) → opens that conversation and focuses the
+     app. Dead ends found on the way, in case a future version moves things:
+     host `claude.ai` `/chat/<uuid>` is claude.ai *web* conversations (a
+     different id space, 404s on a CLI id); host `code` only matches `/new` plus
+     a route-matcher (`uhe`/`fkn`) and rejects everything else silently (the
+     window won't even focus). The `resume` route is not behind the
+     `code`-host's `At("2143883161")` feature gate.
+   * **VS Code extension panel** (`entrypoint == claude-vscode`) — built, **not
+     yet confirmed live.** The official `anthropic.claude-code` extension
+     registers a URI handler whose `/open?session=<id>` route calls
+     `createPanel(id)` → `sessionPanels.get(id).reveal()`, and that map is keyed
+     by our `session_id`. So `open "vscode://anthropic.claude-code/open?session=<sid>"`
+     reveals the exact tab. Caveat: a session living only in the integrated
+     terminal has no panel, so the URI would spawn an empty one — the jump only
+     fires it for this entrypoint (panel / sidebar). Verified by reading the
+     (minified, fast-updating) bundle; recheck if it breaks after an update.
 
-   * **Claude desktop app** (`entrypoint == claude-desktop`) — this is the
-     surface actually in daily use here. It registers the `claude://` URL scheme
-     (`/Applications/Claude.app`), but the route grammar for focusing a specific
-     session is unknown. R&D: inspect the Electron app's resources for a deep
-     link, or whether it exposes session windows/tabs at all. Until then the jump
-     only activates the app.
-   * **VS Code integrated terminal** (`entrypoint == cli`, `TERM_PROGRAM=vscode`)
-     — still window-only. The old OSC-2-title + companion-extension idea still
-     applies here if it turns out to matter: a `SessionStart` hook names the
-     terminal `claude·<short-id>` and an extension finds it by name and calls
-     `.show()`. Lower priority than the desktop app.
+   Remaining, low priority (not used here): **VS Code integrated terminal**
+   (`entrypoint == cli`, `TERM_PROGRAM=vscode`) — still window-only. The old
+   OSC-2-title + companion-extension idea applies if it ever matters: a
+   `SessionStart` hook names the terminal `claude·<short-id>` and an extension
+   finds it by name and calls `.show()`.
 
 2. **Ship to partners.** `.claude-plugin/marketplace.json` is ready;
    `/plugin marketplace add` + `/plugin install` handles the hooks half with no

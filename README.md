@@ -108,16 +108,20 @@ environment at hook time, in descending order of precision:
 | WezTerm | exact pane |
 | VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel for that Claude session id |
 | VS Code integrated terminal | the **window** holding that folder (`open -b com.microsoft.VSCode <cwd>`); you pick the tab |
-| Claude desktop app | app only — activates Claude; no per-session route yet |
+| Claude desktop app | **exact session** — `claude://resume?session=<id>` opens that conversation and focuses the app |
 | Terminal.app | app only — no reliable per-tab handle |
 
 The VS Code extension-panel jump piggybacks on a URI handler the official
 extension registers, so it needs no companion extension — the panel session id
 is Claude Code's own `session_id`, which is what we key records on. (Verified by
 reading the extension bundle; confirm against your own setup, since the bundle
-auto-updates often.) The integrated-terminal and desktop-app cases remain the
-honest limitations: you land in the right window/app but pick the session
-yourself.
+auto-updates often.)
+
+The desktop-app jump works the same way through the app's own `claude://`
+handler: `claude://resume?session=<id>` imports/opens the session by its CLI id
+— the same `session_id` — and focuses the app (verified live). The VS Code
+*integrated terminal* remains the one honest limitation: it's still window-only,
+since a session typed into the terminal has no panel to reveal.
 
 ---
 

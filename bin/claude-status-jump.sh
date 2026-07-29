@@ -58,12 +58,14 @@ case "$entrypoint" in
     open "vscode://anthropic.claude-code/open?session=$sid" >/dev/null 2>&1 && exit 0
     ;;
   claude-desktop)
-    # The desktop app's claude:// handler routes /chat/<uuid> to that
-    # conversation (Zd.ClaudeAI host + Fr.OpenConversation="chat") and focuses
-    # its window. This assumes the app keys conversations by Claude Code's own
-    # session_id — true if verified live; if the id doesn't match, the app just
-    # lands on /recents, so the fall-throughs below still bring it to the front.
-    open "claude://claude.ai/chat/$sid" >/dev/null 2>&1 && exit 0
+    # The desktop app's claude:// handler has a host-level "resume" route that
+    # takes the CLI session id — the same id our hooks record — imports/opens it
+    # and focuses the window:
+    #   case "resume": importCliSession(searchParams.get("session"))
+    # (host "claude.ai" + /chat is claude.ai *web* conversations, a different id
+    # space; host "code" only accepts /new.) If it no-ops, the fall-throughs
+    # still front the app.
+    open "claude://resume?session=$sid" >/dev/null 2>&1 && exit 0
     open -b com.anthropic.claudefordesktop >/dev/null 2>&1 && exit 0
     open -a Claude >/dev/null 2>&1 && exit 0
     ;;
