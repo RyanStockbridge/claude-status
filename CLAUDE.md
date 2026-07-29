@@ -102,15 +102,18 @@ Never verified — no macOS in the authoring environment: all AppleScript,
      a route-matcher (`uhe`/`fkn`) and rejects everything else silently (the
      window won't even focus). The `resume` route is not behind the
      `code`-host's `At("2143883161")` feature gate.
-   * **VS Code extension panel** (`entrypoint == claude-vscode`) — built, **not
-     yet confirmed live.** The official `anthropic.claude-code` extension
-     registers a URI handler whose `/open?session=<id>` route calls
-     `createPanel(id)` → `sessionPanels.get(id).reveal()`, and that map is keyed
-     by our `session_id`. So `open "vscode://anthropic.claude-code/open?session=<sid>"`
-     reveals the exact tab. Caveat: a session living only in the integrated
-     terminal has no panel, so the URI would spawn an empty one — the jump only
-     fires it for this entrypoint (panel / sidebar). Verified by reading the
-     (minified, fast-updating) bundle; recheck if it breaks after an update.
+   * **VS Code extension panel** (`entrypoint == claude-vscode`) — **done,
+     verified live.** The official `anthropic.claude-code` extension registers a
+     URI handler whose `/open?session=<id>` route calls `createPanel(id)` →
+     `sessionPanels.get(id).reveal()`, and that map is keyed by our `session_id`.
+     So `open "vscode://anthropic.claude-code/open?session=<sid>"` reveals the
+     exact tab. The jump first activates the VS Code app (the URI alone doesn't
+     reliably raise the window), then fires the URI. First jump shows a one-time
+     VS Code consent ("Allow 'Claude Code for VS Code' to open this URI?" → "Do
+     not ask again for this extension"). Caveat: a session living only in the
+     integrated terminal has no panel, so the URI would spawn an empty one — the
+     jump only fires it for this entrypoint (panel / sidebar). The bundle is
+     minified and auto-updates often; recheck if a jump breaks after an update.
 
    Remaining, low priority (not used here): **VS Code integrated terminal**
    (`entrypoint == cli`, `TERM_PROGRAM=vscode`) — still window-only. The old

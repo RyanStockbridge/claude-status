@@ -106,16 +106,18 @@ environment at hook time, in descending order of precision:
 | tmux | exact pane (`select-window` + `select-pane`) |
 | iTerm2 | exact session, via AppleScript on `ITERM_SESSION_ID` |
 | WezTerm | exact pane |
-| VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel for that Claude session id |
+| VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel for that Claude session id (one-time per-extension consent on first jump) |
 | VS Code integrated terminal | the **window** holding that folder (`open -b com.microsoft.VSCode <cwd>`); you pick the tab |
 | Claude desktop app | **exact session** — `claude://resume?session=<id>` opens that conversation and focuses the app |
 | Terminal.app | app only — no reliable per-tab handle |
 
 The VS Code extension-panel jump piggybacks on a URI handler the official
 extension registers, so it needs no companion extension — the panel session id
-is Claude Code's own `session_id`, which is what we key records on. (Verified by
-reading the extension bundle; confirm against your own setup, since the bundle
-auto-updates often.)
+is Claude Code's own `session_id`, which is what we key records on. The first
+jump raises a VS Code consent prompt ("Allow 'Claude Code for VS Code' to open
+this URI?"); pick *Do not ask again for this extension* and subsequent jumps are
+seamless. (Verified live; the extension bundle auto-updates often, so recheck if
+a jump ever stops working.)
 
 The desktop-app jump works the same way through the app's own `claude://`
 handler: `claude://resume?session=<id>` imports/opens the session by its CLI id

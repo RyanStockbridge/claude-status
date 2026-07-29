@@ -51,10 +51,17 @@ case "$entrypoint" in
   claude-vscode)
     # The official extension registers a URI handler: /open?session=<id> calls
     # createPanel(id), which reveals the existing panel for that Claude session
-    # id (the same id we key our records on). Opening the URI also brings VS Code
-    # to the front, so this both focuses the window and the exact session tab.
-    # (A session living only in the integrated terminal has no panel, so this
+    # id (the same id we key our records on). Firing the URI routes to the
+    # already-running instance but does NOT reliably raise its window, so bring
+    # VS Code to the front first, then reveal the tab. The very first jump raises
+    # a VS Code consent prompt ("Allow 'Claude Code for VS Code' to open this
+    # URI?") — choose "Do not ask again for this extension" once and every jump
+    # after is seamless.
+    # (A session living only in the integrated terminal has no panel, so the URI
     # would open a fresh one — the extension panel/sidebar is the common case.)
+    for bundle in com.microsoft.VSCode com.microsoft.VSCodeInsiders com.vscodium.codium; do
+      open -b "$bundle" >/dev/null 2>&1 && break
+    done
     open "vscode://anthropic.claude-code/open?session=$sid" >/dev/null 2>&1 && exit 0
     ;;
   claude-desktop)
