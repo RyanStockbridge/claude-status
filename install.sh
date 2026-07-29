@@ -29,7 +29,7 @@ chmod +x "$ROOT/bin/"*.sh "$ROOT/swiftbar/"*.py
 # ---------------------------------------------------------------- SwiftBar ---
 swiftbar_dir() {
   local d
-  d="$(defaults read com.ambrosia.SwiftBar PluginDirectory 2>/dev/null || true)"
+  d="$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)"
   [ -n "$d" ] && [ -d "$d" ] && { printf '%s' "$d"; return; }
   for c in "$HOME/SwiftBar" "$HOME/Documents/SwiftBar" "$HOME/.swiftbar"; do
     [ -d "$c" ] && { printf '%s' "$c"; return; }
@@ -47,18 +47,22 @@ install_swiftbar() {
     dir="$HOME/SwiftBar"; mkdir -p "$dir"
     # Tell SwiftBar where to look; without this it shows an empty menu and
     # gives no indication that anything is wrong.
-    defaults write com.ambrosia.SwiftBar PluginDirectory -string "$dir"
+    defaults write com.ameba.SwiftBar PluginDirectory -string "$dir"
     ok "Set SwiftBar plugin folder to $dir"
     RESTART_SWIFTBAR=1
   fi
-  # SwiftBar won't execute quarantined plugins, and a zip from a browser
-  # stamps every file. Clear it on the real files, not the symlinks.
-  xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null || true
-
-  ln -sf "$ROOT/swiftbar/claude-status.1s.py" "$dir/claude-status.1s.py"
+  # Copy, don't symlink: some SwiftBar builds skip symlinked plugins (and a
+  # symlink into a moved/renamed checkout silently dangles). Copies mean you
+  # re-run this script to update — which is what keeps the installed plugin from
+  # rotting to an old version.
+  cp "$ROOT/swiftbar/claude-status.1s.py" "$dir/claude-status.1s.py"
   # the renderer looks for the jump script beside itself first
-  ln -sf "$ROOT/bin/claude-status-jump.sh" "$dir/claude-status-jump.sh"
-  ok "SwiftBar plugin linked into $dir"
+  cp "$ROOT/bin/claude-status-jump.sh" "$dir/claude-status-jump.sh"
+  chmod +x "$dir/claude-status.1s.py" "$dir/claude-status-jump.sh"
+  # SwiftBar won't execute quarantined plugins, and a zip from a browser stamps
+  # every file. Clear it on the installed copies.
+  xattr -dr com.apple.quarantine "$dir/claude-status.1s.py" "$dir/claude-status-jump.sh" 2>/dev/null || true
+  ok "SwiftBar plugin copied into $dir"
 
   if [ "${RESTART_SWIFTBAR:-0}" = "1" ] && pgrep -x SwiftBar >/dev/null 2>&1; then
     killall SwiftBar 2>/dev/null || true; sleep 1; open -a SwiftBar
