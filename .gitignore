@@ -6,3 +6,6 @@
 *.tmp.*
 
 # Runtime status directory lives in ~/.claude/status, never in the repo
+
+# Swift build artifacts
+app/.build/
