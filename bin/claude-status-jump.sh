@@ -58,8 +58,12 @@ case "$entrypoint" in
     open "vscode://anthropic.claude-code/open?session=$sid" >/dev/null 2>&1 && exit 0
     ;;
   claude-desktop)
-    # No documented route to focus a specific session inside the desktop app yet
-    # (it registers the `claude://` scheme, grammar TBD). Activate the app.
+    # The desktop app's claude:// handler routes /chat/<uuid> to that
+    # conversation (Zd.ClaudeAI host + Fr.OpenConversation="chat") and focuses
+    # its window. This assumes the app keys conversations by Claude Code's own
+    # session_id — true if verified live; if the id doesn't match, the app just
+    # lands on /recents, so the fall-throughs below still bring it to the front.
+    open "claude://claude.ai/chat/$sid" >/dev/null 2>&1 && exit 0
     open -b com.anthropic.claudefordesktop >/dev/null 2>&1 && exit 0
     open -a Claude >/dev/null 2>&1 && exit 0
     ;;
