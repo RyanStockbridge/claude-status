@@ -53,14 +53,17 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             : session.kind.phrase
         content.categoryIdentifier = Self.categoryId
         content.userInfo = ["sessionId": session.sessionId]
+        content.interruptionLevel = .active
         // A sound only for the states you must act on.
         if session.kind == .blocked || session.kind == .error {
             content.sound = .default
         }
-        // One live notification per session: reuse the id so a newer state
-        // replaces the older banner instead of stacking.
+        // Unique per transition (session + when it changed) so each new event
+        // alerts fresh — reusing an id makes macOS silently *update* the existing
+        // Center entry instead of presenting a new banner.
+        let stamp = Int(session.stateSince ?? 0)
         let request = UNNotificationRequest(
-            identifier: "attention-\(session.sessionId)",
+            identifier: "attention-\(session.sessionId)-\(stamp)",
             content: content,
             trigger: nil
         )
