@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 #
-#   ./install.sh              installs the SwiftBar plugin only
-#                             (use this if you install the hooks via /plugin)
-#
-#   ./install.sh --local-hooks  also merges the hooks into ~/.claude/settings.json
-#                               with absolute paths — good for testing before
-#                               you publish the plugin repo
-#
-#   ./install.sh --uninstall    removes both
+#   ./install.sh --local-hooks   merge the status hooks into ~/.claude/settings.json
+#                                (absolute paths to this checkout). This is the default.
+#   ./install.sh --swiftbar      also install the legacy SwiftBar plugin (opt-in)
+#   ./install.sh --uninstall     remove hooks + status dir
 
 set -euo pipefail
 RESTART_SWIFTBAR=0
@@ -38,9 +34,8 @@ swiftbar_dir() {
 
 install_swiftbar() {
   if ! [ -d "/Applications/SwiftBar.app" ]; then
-    warn "SwiftBar not found. Install it with: brew install --cask swiftbar"
-    warn "Then re-run this script."
-    return 1
+    say "SwiftBar not installed — skipping (ClaudeStatus.app is the recommended frontend)."
+    return 0
   fi
   local dir; dir="$(swiftbar_dir)"
   if [ -z "$dir" ]; then
@@ -118,23 +113,23 @@ case "$MODE" in
   --uninstall)
     uninstall_hooks
     d="$(swiftbar_dir)"
-    [ -n "$d" ] && rm -f "$d/claude-status.1s.py" "$d/claude-status-jump.sh" && ok "SwiftBar plugin unlinked"
+    [ -n "$d" ] && rm -f "$d/claude-status.1s.py" "$d/claude-status-jump.sh" && ok "SwiftBar plugin removed"
     rm -rf "$HOME/.claude/status" && ok "Status directory cleared"
+    say "Remove the app too:  rm -rf /Applications/ClaudeStatus.app"
     ;;
-  --local-hooks)
-    install_hooks
+  --swiftbar)
     install_swiftbar || true
+    say ""
+    say "SwiftBar plugin installed (legacy frontend). The native app is recommended."
+    ;;
+  --local-hooks|"")
+    install_hooks
     say ""
     say "Restart any running Claude Code sessions to pick up the hooks."
+    say "Then build the menu bar app:  cd app && ./scripts/bundle.sh --install"
     ;;
   *)
-    install_swiftbar || true
-    say ""
-    say "Now install the hooks. Either:"
-    say "  a) publish this folder as a git repo, then in Claude Code:"
-    say "       /plugin marketplace add <you>/claude-status"
-    say "       /plugin install claude-status@ryan-tools"
-    say "  b) or for a quick local test:  ./install.sh --local-hooks"
+    die "unknown option: $MODE  (use --local-hooks, --swiftbar, or --uninstall)"
     ;;
 esac
 echo

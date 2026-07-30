@@ -1,69 +1,109 @@
 # claude-status
 
-A macOS menu bar readout of every Claude Code session you have running — across
-every project, every VS Code window, every terminal tab. Shows you at a glance
-which ones are working, which are blocked on you, which finished, and which
-errored. Click one to jump straight to it.
+A macOS menu bar app that shows every Claude Code session you have running — across
+every project, every VS Code window, every terminal, and the Claude desktop app.
+See at a glance which sessions are working, which are blocked on you, which
+finished, and which errored — and **click one to jump straight to it**. Get a
+native notification the moment a session needs your input.
+
+No polling, no scraping, no remote-control session. Claude Code's own hooks push
+each session's state to a JSON file; the menu bar app reads it.
 
 ```
-  ● 2        ← menu bar: two sessions want you
+  ● 2                                   ← menu bar: two sessions want you
 
-  lifewize_frontend
-  🟠 refactor the auth middleware…      — needs approval 40s
-  🟡 add the helpdesk runbook page      — Edit 3s
-  lifewize_backend
-  🟢 write migration for ledger table   — done 2m ago
-  power3-ads
-  🔴 (rate_limit)
+  LIFEWIZE
+  ✋ Refactor the auth middleware…       Needs your approval · 40s
+  ● Add the helpdesk runbook page       Edit · 3s
+  POWER3-ADS
+  ✓ Write migration for ledger table    Finished 2m ago
 ```
-
-No polling, no scraping, no remote-control session required. Claude Code's own
-hooks push state out; the menu bar reads it.
 
 ---
 
+## Requirements
+
+- **macOS 14 (Sonoma) or newer**
+- **`jq`** — `brew install jq`
+- **Xcode command-line tools** (to build the app) — `xcode-select --install`
+
 ## Install
 
-**Requirements:** macOS, `jq` (`brew install jq`), and SwiftBar
-(`brew install --cask swiftbar`).
+Two halves: the **hooks** publish each session's state, and the **menu bar app**
+reads it. Clone once, then run both steps:
 
 ```bash
-git clone <your-repo> claude-status && cd claude-status
+git clone https://github.com/RyanStockbridge/claude-status.git
+cd claude-status
+```
+
+**1. Install the hooks** (publishes status to `~/.claude/status/`):
+
+```bash
 ./install.sh --local-hooks
 ```
 
-Restart any running Claude Code sessions, and the menu bar icon populates as
-soon as you send a prompt.
+This backs up and edits `~/.claude/settings.json` to add the hooks. Hooks load at
+session start, so **restart any running Claude Code sessions** afterward — new
+sessions show up in the app as soon as you send a prompt.
 
-`./install.sh --uninstall` reverses everything.
+**2. Build & install the menu bar app:**
 
-### Shipping it to your partners
-
-`--local-hooks` edits `~/.claude/settings.json` directly, which is fine for you
-but not something you want to talk five people through. Push this folder to a
-git repo instead — it already contains `.claude-plugin/marketplace.json` — and
-they run:
-
-```
-/plugin marketplace add <you>/claude-status
-/plugin install claude-status@ryan-tools
+```bash
+cd app && ./scripts/bundle.sh --install
+open -a ClaudeStatus
 ```
 
-That wires the hooks globally with no file editing, and `git push` ships
-updates. They still need SwiftBar and the plugin symlink, so have them run
-`./install.sh` (no flag) once for the menu bar half.
+That compiles `ClaudeStatus.app`, installs it to `/Applications`, and launches it.
+It lives in the menu bar (no Dock icon).
+
+### First-run notes / quirks
+
+- **Gatekeeper:** the app is unsigned (ad-hoc). Because you *build it locally* it
+  carries no quarantine flag, so it just opens. (If you instead copy a prebuilt
+  `.app` from another Mac or a download, macOS will block it — clear it with
+  `xattr -dr com.apple.quarantine /Applications/ClaudeStatus.app`, or approve it
+  in System Settings → Privacy & Security → "Open Anyway".)
+- **Notifications:** on first launch, click **Allow** on the permission prompt.
+  Then in System Settings → Notifications → **ClaudeStatus**, set the alert style
+  to **Alerts** if you want them to stay on screen (Banners auto-dismiss). A Focus
+  / Do Not Disturb will send them to Notification Center only.
+- **Open at Login:** tick the checkbox in the app's popover footer so it starts
+  automatically.
+- **jq required:** the hook writer no-ops silently without `jq`, so install it
+  first.
+
+### Updating
+
+```bash
+cd claude-status && git pull
+./install.sh --local-hooks            # refresh the hooks (safe to re-run)
+cd app && ./scripts/bundle.sh --install   # rebuild & reinstall the app
+```
+
+Then restart the app (quit from its popover, `open -a ClaudeStatus`) and restart
+any Claude sessions to pick up hook changes.
+
+### Uninstall
+
+```bash
+./install.sh --uninstall                 # removes hooks + status dir
+rm -rf /Applications/ClaudeStatus.app    # removes the app
+```
 
 ---
 
 ## How it works
 
-The moving parts:
+Two halves that talk only through a directory of JSON files (`~/.claude/status/`),
+one file per live session.
 
 **`bin/claude-status-write.sh`** — one hook handler for every event. Reads the
 hook payload on stdin, writes `~/.claude/status/<session_id>.json`. Writes are
-atomic (temp file + rename) so the reader never sees a partial record. Every
-failure path exits 0: a broken status writer must never interfere with an
-actual session.
+atomic (temp file + rename) so the reader never sees a partial record. Captures
+the session's launch surface (`CLAUDE_CODE_ENTRYPOINT`) and terminal identity for
+precise jumps. Every failure path exits 0 — a broken status writer must never
+interfere with a real session.
 
 **`hooks/hooks.json`** — the event → state mapping:
 
@@ -80,121 +120,77 @@ actual session.
 
 Every handler is `"async": true`, so none of this adds latency to a turn.
 
-**`bin/claude-status-notify.sh`** — fired by the writer only when a session
-actually changes state. Sends a desktop notification via `terminal-notifier`
-(click the banner to jump straight to that session, and repeat banners for one
-session collapse into a group) or falls back to `osascript` if
-`terminal-notifier` isn't installed. Gated by config (see
-[Notifications](#notifications)); by default it stays quiet for the routine
-`working`/`idle` states and only speaks up for `blocked`, `waiting`, `done`, and
-`error`, with a sound reserved for `blocked`/`error`. Like the writer, every
-path exits 0.
-
-**`swiftbar/claude-status.1s.py`** — reads the directory once a second, groups
-by project, sorts attention-first. Sweeps records older than 6h (crashed
-sessions never fire `SessionEnd`) and flags `working` sessions with no tool
-activity for 2min as possibly wedged.
+**`app/` — the menu bar app** (SwiftUI `MenuBarExtra`). Watches the status
+directory (event-driven, no polling), groups sessions by project attention-first,
+draws the colored status dot + attention count, and posts a native notification
+(with a **Jump** action) the moment a session enters `blocked`/`waiting`/`error`.
+Sweeps records older than 6h (crashed sessions never fire `SessionEnd`) and flags
+`working` sessions idle >2min as possibly stalled.
 
 ### Jumping to a session
 
-`bin/claude-status-jump.sh` uses the session's launch surface
-(`CLAUDE_CODE_ENTRYPOINT`) and the terminal identity captured from the
-environment at hook time, in descending order of precision:
+Clicking a session runs `bin/claude-status-jump.sh`, which focuses the host as
+precisely as it allows, keyed on Claude Code's own `session_id`:
 
 | Surface | Precision |
 |---|---|
-| tmux | exact pane (`select-window` + `select-pane`) |
+| Claude desktop app | **exact session** — `claude://resume?session=<id>` opens that conversation and focuses the app |
+| VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel (one-time per-extension consent on first jump) |
+| tmux | exact pane |
 | iTerm2 | exact session, via AppleScript on `ITERM_SESSION_ID` |
 | WezTerm | exact pane |
-| VS Code extension panel | **exact session tab** — `vscode://anthropic.claude-code/open?session=<id>` reveals the panel for that Claude session id (one-time per-extension consent on first jump) |
-| VS Code integrated terminal | the **window** holding that folder (`open -b com.microsoft.VSCode <cwd>`); you pick the tab |
-| Claude desktop app | **exact session** — `claude://resume?session=<id>` opens that conversation and focuses the app |
+| VS Code integrated terminal | the **window** holding that folder; you pick the tab |
 | Terminal.app | app only — no reliable per-tab handle |
 
-The VS Code extension-panel jump piggybacks on a URI handler the official
-extension registers, so it needs no companion extension — the panel session id
-is Claude Code's own `session_id`, which is what we key records on. The first
-jump raises a VS Code consent prompt ("Allow 'Claude Code for VS Code' to open
-this URI?"); pick *Do not ask again for this extension* and subsequent jumps are
-seamless. (Verified live; the extension bundle auto-updates often, so recheck if
-a jump ever stops working.)
-
-The desktop-app jump works the same way through the app's own `claude://`
-handler: `claude://resume?session=<id>` imports/opens the session by its CLI id
-— the same `session_id` — and focuses the app (verified live). The VS Code
-*integrated terminal* remains the one honest limitation: it's still window-only,
-since a session typed into the terminal has no panel to reveal.
+Both the desktop-app and VS Code-panel jumps piggyback on URI handlers those apps
+already register — no companion extension. (Verified live; both bundles
+auto-update often, so recheck if a jump ever stops working.)
 
 ---
 
-## Tuning
+## Options
 
-- **Too chatty?** Drop the `PostToolUse` block from `hooks/hooks.json`. You
-  lose the live tool line and the stall detection, but you also stop spawning a
-  process per tool call.
-- **Faster/slower refresh:** rename the plugin file — `claude-status.2s.py`,
-  `.5s.py`, etc. SwiftBar reads the interval from the filename.
-- **Different status dir:** set `CLAUDE_STATUS_DIR` (both halves respect it).
+- **Different status dir:** set `CLAUDE_STATUS_DIR` (both halves respect it). The
+  app also reads a `statusDir` value from its own `UserDefaults` for testing.
+- **Too chatty?** Drop the `PostToolUse` block from `hooks/hooks.json` to stop
+  spawning a process per tool call (you lose the live tool line + stall detection).
 
-### Notifications
+### Shell-notifier alternative
 
-Banners are on by default for the states that want your attention. To tune them,
-create `~/.claude/claude-status.json`:
+The app owns notifications. There's also a standalone shell notifier
+(`bin/claude-status-notify.sh`, via `terminal-notifier`/`osascript`) for setups
+not running the app — configure it in `~/.claude/claude-status.json`:
 
 ```json
-{
-  "notifications": {
-    "enabled": true,
-    "min_turn_seconds": 0,
-    "states": {
-      "blocked": true,
-      "waiting": true,
-      "done": true,
-      "error": true,
-      "working": false,
-      "idle": false
-    }
-  }
-}
+{ "notifications": { "enabled": true, "min_turn_seconds": 0,
+  "states": { "blocked": true, "waiting": true, "done": true, "error": true,
+              "working": false, "idle": false } } }
 ```
 
-- **`enabled`** — master switch. Set to `false` to silence everything (a real
-  `false`, not just a missing key, is honored).
-- **`states`** — turn any individual state on or off. Omitted states keep their
-  defaults (on for `error`/`blocked`/`waiting`/`done`, off for
-  `working`/`idle`).
-- **`min_turn_seconds`** — suppress the "done" banner when a turn finished faster
-  than this, so quick one-off commands don't ping you. Only affects the
-  `working`→`done`/`idle` transition; attention states always come through.
+`enabled:false` silences it (a real `false` is honored). If you run **both** the
+app and the shell notifier you'll get double banners — keep one. `min_turn_seconds`
+suppresses the "done" banner for turns shorter than N seconds.
 
-Install [`terminal-notifier`](https://github.com/julienXX/terminal-notifier)
-(`brew install terminal-notifier`) for clickable, grouped banners; without it,
-notifications still work through `osascript` but can't be clicked to jump.
+### SwiftBar (legacy frontend)
+
+Before the native app there was a SwiftBar plugin (`swiftbar/claude-status.1s.py`)
+— a 1s-poll renderer of the same files. Still works if you prefer SwiftBar
+(`brew install --cask swiftbar`, then `./install.sh --swiftbar`), but the native
+app is recommended. Don't run both, or you'll get two menu bar items.
 
 ## Remote sessions (VS Code Remote SSH)
 
-Sessions running on another machine write their status files *on that machine*,
-so a local file watcher won't see them. Two options:
+Sessions on another machine write their status files *there*, so a local watcher
+won't see them. The jump script detects a foreign `host` and copies an
+`ssh … claude --resume …` command to your clipboard. For real remote tracking,
+switch the hook entries from `"type": "command"` to `"type": "http"` pointed at a
+listener on your laptop (over Tailscale or an SSH reverse tunnel) that writes the
+identical files.
 
-1. **Quick:** the menu shows nothing for them, but `claude --resume` still
-   works — the jump script detects a foreign `host` and copies an
-   `ssh … claude --resume …` command to your clipboard.
-2. **Proper:** switch the hook entries from `"type": "command"` to
-   `"type": "http"` pointing at a small listener on your laptop, reachable over
-   Tailscale or an SSH reverse tunnel. Claude Code POSTs the same JSON payload,
-   so the listener can write the identical status files. No file syncing.
+## Roadmap
 
-## Next: the native app
-
-This is the v0 whose job is to prove the state model is right before anyone
-writes Swift. Once the states feel correct in daily use, the SwiftBar script
-becomes a ~350-line SwiftUI `MenuBarExtra`:
-
-- `FSEventStream` on the status dir instead of a 1s poll
-- a real badge count on the icon, and an animated glyph while anything works
-- `UNUserNotificationCenter` banner the moment a session flips to `blocked`
-- global hotkey to cycle through sessions needing attention
-- distribute via a Homebrew cask; sign + notarize with an Apple Developer
-  account so partners don't hit Gatekeeper
-
-The hooks half doesn't change — the Swift app reads exactly the same files.
+- **Sign + notarize + Homebrew cask** — so friends can `brew install --cask`
+  without building. Needs an Apple Developer ID; until then, build from source
+  (above).
+- Global hotkey to cycle sessions needing attention.
+- Splitting `working` into "running a tool" vs "thinking", and a decay on `done`.
