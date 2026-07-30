@@ -5,18 +5,23 @@ import Foundation
 /// panel / Claude desktop / …). We locate the script rather than reimplement it.
 enum Jump {
     /// First hit wins:
-    ///   1. $CLAUDE_STATUS_JUMP                     (explicit override)
-    ///   2. claude-status-jump.sh next to the app    (bundled install)
-    ///   3. the SwiftBar plugin copy                 (existing install)
-    ///   4. the dev checkout                          (running from source)
+    ///   1. $CLAUDE_STATUS_JUMP                       (explicit override)
+    ///   2. Contents/Resources/claude-status-jump.sh   (bundled in the .app)
+    ///   3. next to the executable                     (CLI / dev binary)
+    ///   4. the SwiftBar plugin copy                   (existing install)
+    ///   5. the dev checkout                           (running from source)
     static func scriptPath() -> String? {
         let fm = FileManager.default
         var candidates: [String] = []
         if let env = ProcessInfo.processInfo.environment["CLAUDE_STATUS_JUMP"] {
             candidates.append(env)
         }
-        let exeDir = Bundle.main.bundleURL.deletingLastPathComponent()
-        candidates.append(exeDir.appendingPathComponent("claude-status-jump.sh").path)
+        if let res = Bundle.main.resourceURL {
+            candidates.append(res.appendingPathComponent("claude-status-jump.sh").path)
+        }
+        if let exe = Bundle.main.executableURL?.deletingLastPathComponent() {
+            candidates.append(exe.appendingPathComponent("claude-status-jump.sh").path)
+        }
         let home = fm.homeDirectoryForCurrentUser
         candidates.append(home.appendingPathComponent("Documents/swiftbar-repository/claude-status-jump.sh").path)
         candidates.append(home.appendingPathComponent("claude-status/bin/claude-status-jump.sh").path)
