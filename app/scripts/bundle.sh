@@ -24,6 +24,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ClaudeStatus"
 cp "$APP_ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+# App icon (Finder + notifications): generate the .icns from the source PNG if
+# it's missing or stale, then bundle it.
+if [ -f "$APP_ROOT/Resources/icon.png" ]; then
+  if [ ! -f "$APP_ROOT/Resources/AppIcon.icns" ] || \
+     [ "$APP_ROOT/Resources/icon.png" -nt "$APP_ROOT/Resources/AppIcon.icns" ]; then
+    "$APP_ROOT/scripts/make-icon.sh" >/dev/null
+  fi
+  cp "$APP_ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+fi
 # Bundle the jump script so the app is self-contained (no dev checkout needed).
 cp "$REPO_ROOT/bin/claude-status-jump.sh" "$APP/Contents/Resources/claude-status-jump.sh"
 chmod +x "$APP/Contents/Resources/claude-status-jump.sh"

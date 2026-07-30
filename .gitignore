@@ -9,3 +9,5 @@
 
 # Swift build artifacts
 app/.build/
+app/Resources/AppIcon.icns
+app/dist/
