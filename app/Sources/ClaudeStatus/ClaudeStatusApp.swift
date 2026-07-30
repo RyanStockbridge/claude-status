@@ -70,6 +70,7 @@ struct MenuBarLabel: View {
 
 struct PopoverView: View {
     @ObservedObject var store: SessionStore
+    @State private var launchAtLogin = LoginItem.isEnabled
 
     var body: some View {
         VStack(spacing: 0) {
@@ -123,12 +124,19 @@ struct PopoverView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            Toggle("Open at Login", isOn: $launchAtLogin)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .onChange(of: launchAtLogin) { _, on in
+                    launchAtLogin = LoginItem.setEnabled(on)
+                }
+            Spacer()
             if let done = store.counts[.done], done > 0 {
-                Button("Clear finished (\(done))") { store.clearFinished() }
+                Button("Clear finished") { store.clearFinished() }
                     .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Spacer()
             Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power").font(.system(size: 11))
             }
@@ -136,6 +144,7 @@ struct PopoverView: View {
             .help("Quit Claude Status")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
+        .onAppear { launchAtLogin = LoginItem.isEnabled }
     }
 
     private func jump(_ session: Session) {
