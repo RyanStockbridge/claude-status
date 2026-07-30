@@ -28,14 +28,16 @@ enum Jump {
         return candidates.first { fm.isExecutableFile(atPath: $0) }
     }
 
-    static func to(_ session: Session) {
+    static func to(_ session: Session) { to(sessionId: session.sessionId) }
+
+    static func to(sessionId: String) {
         guard let path = scriptPath() else {
             NSLog("claude-status: no claude-status-jump.sh found on any known path")
             return
         }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/bash")
-        proc.arguments = [path, session.sessionId]
+        proc.arguments = [path, sessionId]
         do { try proc.run() } catch {
             NSLog("claude-status: jump failed: \(error.localizedDescription)")
         }

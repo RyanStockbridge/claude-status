@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// One live Claude Code session, decoded from ~/.claude/status/<sid>.json.
 /// Mirrors the record written by bin/claude-status-write.sh. Extra keys in the
@@ -40,14 +41,41 @@ enum SessionState: String, CaseIterable {
         }
     }
 
-    var color: Color {
+    var color: Color { Color(nsColor: nsColor) }
+
+    var nsColor: NSColor {
         switch self {
-        case .error:   return Color(red: 1.00, green: 0.37, blue: 0.34)
-        case .blocked: return Color(red: 1.00, green: 0.62, blue: 0.04)
-        case .waiting: return Color(red: 0.04, green: 0.52, blue: 1.00)
-        case .done:    return Color(red: 0.19, green: 0.82, blue: 0.35)
-        case .working: return Color(red: 1.00, green: 0.84, blue: 0.04)
-        case .idle:    return Color(red: 0.56, green: 0.56, blue: 0.58)
+        case .error:   return NSColor(srgbRed: 1.00, green: 0.37, blue: 0.34, alpha: 1)
+        case .blocked: return NSColor(srgbRed: 1.00, green: 0.62, blue: 0.04, alpha: 1)
+        case .waiting: return NSColor(srgbRed: 0.04, green: 0.52, blue: 1.00, alpha: 1)
+        case .done:    return NSColor(srgbRed: 0.19, green: 0.82, blue: 0.35, alpha: 1)
+        case .working: return NSColor(srgbRed: 0.96, green: 0.72, blue: 0.02, alpha: 1)
+        case .idle:    return NSColor(srgbRed: 0.56, green: 0.56, blue: 0.58, alpha: 1)
+        }
+    }
+
+    /// SF Symbol for the row indicator — conveys the state at a glance without
+    /// leaning on emoji.
+    var symbol: String {
+        switch self {
+        case .error:   return "exclamationmark.triangle.fill"
+        case .blocked: return "hand.raised.fill"
+        case .waiting: return "bubble.left.fill"
+        case .done:    return "checkmark.circle.fill"
+        case .working: return "circle.fill"
+        case .idle:    return "moon.zzz.fill"
+        }
+    }
+
+    /// Short human label used in the row subtitle and notifications.
+    var phrase: String {
+        switch self {
+        case .error:   return "Error"
+        case .blocked: return "Needs your approval"
+        case .waiting: return "Waiting for your input"
+        case .done:    return "Finished"
+        case .working: return "Working"
+        case .idle:    return "Idle"
         }
     }
 

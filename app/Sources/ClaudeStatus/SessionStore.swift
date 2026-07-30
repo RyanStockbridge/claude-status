@@ -5,6 +5,8 @@ import Combine
 /// sessions, grouped and sorted the way the menu renders them.
 @MainActor
 final class SessionStore: ObservableObject {
+    static let shared = SessionStore()
+
     @Published private(set) var sessions: [Session] = []
 
     /// A crashed session never fires SessionEnd; sweep records this stale.
@@ -15,6 +17,14 @@ final class SessionStore: ObservableObject {
     let dir: URL
     private var watcher: DirectoryWatcher?
     private var tick: Timer?
+
+    /// Last-seen state per session, for detecting transitions into an attention
+    /// state. `primed` suppresses a notification burst for sessions that already
+    /// need attention when the app launches.
+    private var lastStates: [String: SessionState] = [:]
+    private var primed = false
+    /// Called when a session newly enters error / blocked / waiting.
+    var onNeedsAttention: ((Session) -> Void)?
 
     init(dir: URL = SessionStore.defaultDir) {
         self.dir = dir
@@ -30,8 +40,13 @@ final class SessionStore: ObservableObject {
     }
 
     static var defaultDir: URL {
-        if let override = ProcessInfo.processInfo.environment["CLAUDE_STATUS_DIR"] {
-            return URL(fileURLWithPath: override)
+        // env for `swift run`; UserDefaults `statusDir` for the installed .app
+        // (LaunchServices doesn't pass env); else the real directory.
+        if let env = ProcessInfo.processInfo.environment["CLAUDE_STATUS_DIR"] {
+            return URL(fileURLWithPath: env)
+        }
+        if let pref = UserDefaults.standard.string(forKey: "statusDir"), !pref.isEmpty {
+            return URL(fileURLWithPath: (pref as NSString).expandingTildeInPath)
         }
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/status")
@@ -59,6 +74,17 @@ final class SessionStore: ObservableObject {
             loaded.append(s)
         }
         sessions = loaded
+        detectAttention(in: loaded)
+    }
+
+    private func detectAttention(in loaded: [Session]) {
+        if primed {
+            for s in loaded where SessionState.attention.contains(s.kind) && lastStates[s.sessionId] != s.kind {
+                onNeedsAttention?(s)
+            }
+        }
+        lastStates = Dictionary(loaded.map { ($0.sessionId, $0.kind) }, uniquingKeysWith: { a, _ in a })
+        primed = true
     }
 
     // MARK: derived views
